@@ -1,6 +1,7 @@
 from substack_api import Post, Newsletter, User
 from typing import List
 from datetime import datetime, timezone
+from pathlib import Path
 
 def download_substack_posts(username: str, date: str) -> dict:
     """Downloads posts from all newsletters that a user is subscribed to within a given time range.
@@ -52,10 +53,15 @@ def get_posts_by_newsletter(newsletter: Newsletter, name: str, date: str) -> dic
         filtered_posts = get_posts_after_date(posts, dt)
 
         for post in filtered_posts:
-            metadata = post.get_metadata()
-            content = post.get_content()
-            with open(f"post_content/{name}/{metadata["social_title"]}", 'w') as f:
-                f.write(content)
+            try:
+                metadata = post.get_metadata()
+                content = post.get_content()
+                Path(f'post_content/{name}').mkdir(parents=True, exist_ok=True)
+                with open(f"post_content/{name}/{metadata["slug"]}", 'w') as f:
+                    f.write(content)
+            except Exception as e:
+                print(e)
+                continue
         
         return {"status": "success", "message": "Posts downloaded successfully"}
     
@@ -79,6 +85,6 @@ def get_posts_after_date(posts: List[Post], dt: datetime) -> List[Post]:
     res = []
     for post in posts:
         post_date = datetime.strptime(post.get_metadata()["post_date"], "%Y-%m-%dT%H:%M:%S.%f%z")
-        if post_date <= dt:
+        if post_date >= dt:
             res.append(post)
     return res
