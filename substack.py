@@ -2,6 +2,11 @@ from substack_api import Post, Newsletter, User
 from typing import List
 from datetime import datetime, timezone
 from pathlib import Path
+import logging
+from bs4 import BeautifulSoup
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def download_substack_posts(username: str, date: str) -> dict:
     """Downloads posts from all newsletters that a user is subscribed to within a given time range.
@@ -19,12 +24,19 @@ def download_substack_posts(username: str, date: str) -> dict:
     user = User(username)
     newsletters = {}
     for d in user.get_subscriptions():
-        newsletters[d["publication_name"]] = Newsletter(f"https://{d["domain"]}")
+        try:
+            newsletters[d["publication_name"]] = Newsletter(f"https://{d["domain"]}")
+            logging.info(f"Added newsletter: {d['publication_name']}")
+        except Exception as e:
+            logging.error(f"Error adding newsletter {d['publication_name']}: {e}")
+            continue
     
     for name, newsletter in newsletters.items():
-        response = get_posts_by_newsletter(newsletter, name, date)
-        if response["status"] == "error":
-            return response
+        try:
+            response = get_posts_by_newsletter(newsletter, name, date)
+            logging.info(response)
+        except Exception as e:
+            continue
     return {"status": "success", "message": "Posts downloaded successfully"}
     
     
@@ -55,17 +67,33 @@ def get_posts_by_newsletter(newsletter: Newsletter, name: str, date: str) -> dic
         for post in filtered_posts:
             try:
                 metadata = post.get_metadata()
-                content = post.get_content()
+                html = metadata["body_html"]
+                soup = BeautifulSoup(html, 'html.parser')
+
+                header = soup.new_tag('header')
+                h1 = soup.new_tag('h1')
+                h1.string = metadata["title"]
+                h2 = soup.new_tag('p')
+                h2.string = metadata["subtitle"]
+                header.append(h1)
+                header.append(h2)
+                soup.insert(0, header)
+
                 Path(f'post_content/{name}').mkdir(parents=True, exist_ok=True)
-                with open(f"post_content/{name}/{metadata["slug"]}", 'w') as f:
-                    f.write(content)
+                
+                with open(f"post_content/{name}/{metadata["slug"]}.html", 'w', encoding='utf-8') as f:
+                    f.write(str(soup))
+
+                logging.info(f"Added post {metadata['slug']} from newsletter {name}")
+
             except Exception as e:
-                print(e)
+                logging.error(f"Error adding post {metadata['slug']} from newsletter {name}: {e}")
                 continue
         
         return {"status": "success", "message": "Posts downloaded successfully"}
     
     except Exception as e:
+        logging.error(f"Error downloading posts from newsletter {name}: {e}")
         return {"status": "error", "message": str(e)}
 
 
