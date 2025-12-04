@@ -55,33 +55,45 @@ def update_date(tool_context: ToolContext, date_str: str):
         return {"status": "success", "message": "Date updated successfully"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
-
-def get_posts(tool_context: ToolContext, username: str | None = None, date_str: str | None = None):
+    
+def get_username(tool_context: ToolContext):
     """
-    Downloads posts from all newsletters that a user is subscribed to within a given time range.
+    Retrieves the username stored in the tool context state.
 
     Args:
         tool_context (ToolContext): The ToolContext object containing the state of the conversation
-        username (str | None): The username of the user to download posts for
-        date_str (str | None): The date to download posts from in the format %Y-%m-%dT%H:%M:%S.%f%z
+
+    Returns:
+        str: The username stored in the tool context state
+    """
+    return tool_context.state.get("username", None)
+
+def get_date(tool_context: ToolContext):
+    """
+    Retrieves the date stored in the tool context state.
+
+    Args:
+        tool_context (ToolContext): The ToolContext object containing the state of the conversation
+
+    Returns:
+        str: The date stored in the tool context state
+    """
+    return tool_context.state.get("date", None)
+
+def get_posts(username: str, date_str: str):
+    response = download_substack_posts(username, date_str)
+    """
+    Downloads posts from substack for a given username and date.
+
+    Args:
+        username (str): The username to download posts for
+        date_str (str): The date to download posts from in the format %Y-%m-%dT%H:%M:%S.%f%z
 
     Returns:
         Dictionary containing the status of the download and a message describing the result.
         Success: {"status": "success", "message": "Posts downloaded successfully"}
         Error: {"status": "error", "message": "Error downloading posts"}
     """
-    if not username:
-        try:
-            username = tool_context.state.get("username")
-        except Exception as e:
-            return {"status": "error", "message": str(e)}
-    if not date_str:
-        try:
-            date_str = tool_context.state.get("date")
-        except Exception as e:
-            return {"status": "error", "message": str(e)}
-
-    response = download_substack_posts(username, date_str)
 
     if response["status"] == "error":
         return {"status": "error", "message": "Error downloading posts"}
@@ -95,11 +107,10 @@ root_agent = LlmAgent(
         model="gemini-2.5-flash-lite",
         retry_options=retry_config
     ),
-    instruction="""Your primary function is to get posts from substack using the get_posts tool. 
-    If the username and date are not provided, use the username and date stored in the tool context state.
-    If there is not username in the tool context state, ask the user to provide a username.
-    If there is no date in the tool context state, ask the user to provide a date.
+    instruction="""Your primary function is to get posts from substack using the get_posts tool. Say 'download completed' when you are done.
+    If the username is not provided, use the get_username tool to get the username. If the result is None, ask the user to provide a username.
+    If the date is not provided, use the get_date tool to get the date. If the result is None, ask the user to provide a date.
     Whenever the user provides a username, use the update_username tool to update the username in the tool context state.
     Whenever the user provides a date, use the update_date tool to update the date in the tool context state.""",
-    tools=[get_posts, update_username, update_date]
+    tools=[get_posts, update_username, update_date, get_username, get_date],
 )
