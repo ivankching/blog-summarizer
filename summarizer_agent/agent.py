@@ -11,12 +11,11 @@ retry_config=types.HttpRetryOptions(
     http_status_codes=[429, 500, 503, 504], # Retry on these HTTP errors
 )
 
-def read_md_file(tool_context: ToolContext, filepath: str) -> dict:
+def read_md_file(filepath: str) -> dict:
     """
     Reads the content of a specified text file.
 
     Args:
-        tool_context: The ADK tool context.
         filename: The name of the file to read.
 
     Returns:
